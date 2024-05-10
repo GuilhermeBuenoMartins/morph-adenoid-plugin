@@ -1,32 +1,31 @@
 package config;
 
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.net.URISyntaxException;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Properties;
 
 import ch.systemsx.cisd.hdf5.HDF5Factory;
 import ij.IJ;
-import nn.Model;
-import nn.enums.Activation;
-import nn.enums.Padding;
-import nn.layers.Dense;
-import nn.layers.Flatten;
-import nn.layers.Opening2D;
-import nn.layers.TopHatOpening2D;
+import neural.network.Activation;
+import neural.network.Model;
+import neural.network.impl.Dense;
+import neural.network.impl.Flatten;
+import neural.network.impl.Opening2D;
+import neural.network.impl.TopHatOpening2D;
 
 public class Config {
 
-    private static final String SEP = ",";
+    public static final String SEP = ",";
 
     private static final String SETTINGS_FILE = "settings.properties";
 
     private static ClassLoader loader = Config.class.getClassLoader();
 
     private static Properties properties = null;
+
+    private static Model model = null;
 
     private Config() {
     }
@@ -46,23 +45,27 @@ public class Config {
         return properties;
     }
 
-    private static Model buildModel() {
-        return new Model(new TopHatOpening2D(), new Opening2D(Padding.VALID), new Flatten(),
-                new Dense(Activation.TANH), new Dense(Activation.TANH), new Dense(Activation.SIGMOID));
+    public static Model getModel() {
+        if (model == null) { model = loadModel(); }
+        return model;
     }
 
-    public static synchronized Model loadModel() {
-        Model model = buildModel();
-        final String DIRECTORY = IJ.getDir("plugins").concat("/").concat(
-                getProperties().getProperty("layers.subdirectory"));
-        String[] layerIds = getProperties().getProperty("layers.ids").split(SEP);
+    private static Model loadModel() {
+        model = buildModel();
+        final Path DIR = Path.of(IJ.getDir("plugins"), getProperties().getProperty("layers.subdirectory"));
+        final String[] layerIds = getProperties().getProperty("layers.ids").split(SEP);
         for (String layerId : layerIds) {
-            int[] wShape = Arrays.stream(getProperties().getProperty(String.format("layers.layer_%s.shape", layerId))
-                    .split(SEP)).mapToInt(s -> Integer.parseInt(s)).toArray();
-            model.loadFrom(
-                    HDF5Factory.openForReading(String.format("%s/layer_%s.h5", DIRECTORY, layerId)),
-                    Integer.parseInt(layerId), wShape);
+            int[] wShape = Arrays.stream(
+                    getProperties().getProperty(String.format("layers.layer_%s.shape", layerId)).split(SEP))
+                    .mapToInt(s -> Integer.parseInt(s)).toArray();
+            model.loadLayer(Integer.parseInt(layerId), wShape,
+                    HDF5Factory.openForReading(String.format("%s/layer_%s.h5", DIR.toAbsolutePath(), layerId)));
         }
         return model;
+    }
+
+    private static Model buildModel() {
+        return new Model(new TopHatOpening2D(), new Opening2D(), new Flatten(),
+                new Dense(Activation.TANH), new Dense(Activation.TANH), new Dense(Activation.SIGMOID));
     }
 }
