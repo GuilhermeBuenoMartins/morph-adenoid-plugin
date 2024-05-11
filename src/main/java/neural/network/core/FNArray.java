@@ -2,9 +2,7 @@ package neural.network.core;
 
 public interface FNArray {
 
-    Object getObject();
-
-    float get(int... i);
+    float get(int... coord);
 
     void set(float value, int... coord);
 

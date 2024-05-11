@@ -15,7 +15,9 @@ public interface Utils {
         IntStream.range(0, x.getShape(0)).parallel().forEach(i -> {
             IntStream.range(0, x.getShape(1)).parallel().forEach(j -> {
                 IntStream.range(0, x.getShape(2)).parallel().forEach(k -> {
-                    ((float[][][][]) xPad.getObject())[i][j + padH][k + padW] = ((float[][][][]) x.getObject())[i][j][k];
+                    IntStream.range(0, x.getShape(3)).parallel().forEach(l -> {
+                        xPad.set(x.get(i, j, k, l), i, j + padH, k + padW, l);
+                    });
                 });
             });
         });
