@@ -1,4 +1,6 @@
 
+import java.awt.Color;
+import java.awt.Image;
 import java.util.Arrays;
 import java.util.stream.IntStream;
 
@@ -8,6 +10,9 @@ import ij.ImagePlus;
 import ij.ImageStack;
 import ij.gui.GenericDialog;
 import ij.plugin.PlugIn;
+import ij.process.ByteProcessor;
+import ij.process.ColorProcessor;
+import ij.process.FloatProcessor;
 import ij.process.ImageProcessor;
 import neural.network.core.FNArray;
 import neural.network.core.FNArrayFactory;
@@ -91,17 +96,67 @@ public class MorphAdenoid_ implements PlugIn {
         }
 
         private FNArray getSample(ImageProcessor ip) {
+                ImageProcessor resized = resize(ip, INPUT_SHAPE[0], INPUT_SHAPE[1]);
+                int[] pixels = (int[]) resized.getPixels();
+                float[] values = new float[INPUT_SHAPE[0] * INPUT_SHAPE[1] * INPUT_SHAPE[2]];
                 int chLength = INPUT_SHAPE[0] * INPUT_SHAPE[1];
-                float[] values = new float[chLength * INPUT_SHAPE[2]];
-                int[] pixels = (int[]) ip.resize(INPUT_SHAPE[0], INPUT_SHAPE[1]).getPixels();
                 for (int i = 0; i < pixels.length / INPUT_SHAPE[2]; i += INPUT_SHAPE[2]) {
-                        values[i] = (float) pixels[i];
-                        values[chLength + i] = (float) pixels[i + 1];
-                        values[2 * chLength + i] = (float) pixels[i + 2];
+                                values[i] = pixels[i];
+                                values[i + chLength] = pixels[i + 1];
+                                values[i + 2 * chLength] = pixels[i + 2];
                 }
-                return FNArrayFactory.create(
-                                new int[] { 1, INPUT_SHAPE[0], INPUT_SHAPE[1], INPUT_SHAPE[2] },
-                                values);
+                return FNArrayFactory.create(new int[] { 1, INPUT_SHAPE[0], INPUT_SHAPE[1], INPUT_SHAPE[2] }, values);
         }
 
+        private ImageProcessor resize(ImageProcessor src, int dstW, int dstH) {
+                ImageProcessor dst = src.createProcessor(dstW, dstH);
+                double xScale = ((double) dstW) / src.getWidth();
+                double yScale = ((double) dstH) / src.getHeight();
+                int pul, pur, pll, plr;
+                double rul, rur, rll, rlr;
+                double gul, gur, gll, glr;
+                double bul, bur, bll, blr;
+                int r, g, b;
+                for (int w = 0; w < INPUT_SHAPE[0]; w++) {
+                        for (int h = 0; h < INPUT_SHAPE[1]; h++) {
+                                int x = (int) (w / xScale);
+                                int y = (int) (h / yScale);
+                                double dx = (w / xScale) - x;
+                                double dy = (h / yScale) - y;
+                                pul = src.getPixel(x, y);
+                                rul = dx * dy * getRed(pul);
+                                gul = dx * dy * getGreen(pul);
+                                bul = dx * dy * getBlue(pul);
+                                pur = src.getPixel(x + 1, y);
+                                rur = (1 - dx) * dy * getRed(pur);
+                                gur = (1 - dx) * dy * getGreen(pur);
+                                bur = (1 - dx) * dy * getBlue(pur);
+                                pll = src.getPixel(x, y + 1);
+                                rll = dx * (1 - dy) * getRed(pll);
+                                gll = dx * (1 - dy) * getGreen(pll);
+                                bll = dx * (1 - dy) * getBlue(pll);
+                                plr = src.getPixel(x + 1, y + 1);
+                                rlr = (1 - dx) * (1 - dy) * getRed(plr);
+                                glr = (1 - dx) * (1 - dy) * getGreen(plr);
+                                blr = (1 - dx) * (1 - dy) * getBlue(plr);
+                                r = (int) (rul + rur + rll + rlr + 0.5);
+                                g = (int) (gul + gur + gll + glr + 0.5);
+                                b = (int) (bul + bur + bll + blr + 0.5);
+                                dst.putPixel(w, h, (r << 16) | (g << 8) | b);
+                        }
+                }
+                return dst;
+        }
+
+        private int getRed(int pixel) {
+                return (pixel & 0xff0000) >> 16;
+        }
+
+        private int getGreen(int pixel) {
+                return (pixel & 0xff00) >> 8;
+        }
+
+        private int getBlue(int pixel) {
+                return pixel & 0xff;
+        }
 }
