@@ -66,8 +66,9 @@ public class MorphAdenoid_ implements PlugIn {
         private void classify(ImageStack stack) {
                 final int step = getStep(stack);
                 IntStream.range(0, stack.getSize()).filter(i -> i % step == 0).forEach(i -> {
+                        FNArray x = getSample(stack.getProcessor(i + 1));
                         long startTime = System.currentTimeMillis();
-                        float score = Config.getModel().predict(getSample(stack.getProcessor(i + 1))).get(0, 0);
+                        float score = Config.getModel().predict(x).get(0, 0);
                         long time = System.currentTimeMillis() - startTime;
                         if (score >= BOUNDARY) {
                                 new ImagePlus(String.format(TITLE_CLASSIFIED_IMAGE, "POSITIVE", time, score),
@@ -87,8 +88,9 @@ public class MorphAdenoid_ implements PlugIn {
         }
 
         private void classify(ImageProcessor ip) {
+                FNArray x = getSample(ip);
                 long startTime = System.currentTimeMillis();
-                float score = Config.getModel().predict(getSample(ip)).get(0, 0);
+                float score = Config.getModel().predict(x).get(0, 0);
                 long time = System.currentTimeMillis() - startTime;
                 IJ.getImage().setTitle(
                                 String.format(TITLE_CLASSIFIED_IMAGE, BOUNDARY > score ? "NEGATIVE" : "POSITIVE", time,
@@ -96,22 +98,21 @@ public class MorphAdenoid_ implements PlugIn {
         }
 
         private FNArray getSample(ImageProcessor ip) {
-                ImageProcessor resized = resize(ip, INPUT_SHAPE[0], INPUT_SHAPE[1]);
-                int[] pixels = (int[]) resized.getPixels();
+                int[] pixels = (int[]) resize(ip);
                 float[] values = new float[INPUT_SHAPE[0] * INPUT_SHAPE[1] * INPUT_SHAPE[2]];
                 int chLength = INPUT_SHAPE[0] * INPUT_SHAPE[1];
                 for (int i = 0; i < pixels.length / INPUT_SHAPE[2]; i += INPUT_SHAPE[2]) {
-                                values[i] = pixels[i];
-                                values[i + chLength] = pixels[i + 1];
-                                values[i + 2 * chLength] = pixels[i + 2];
+                        values[i] = pixels[i];
+                        values[i + chLength] = pixels[i + 1];
+                        values[i + 2 * chLength] = pixels[i + 2];
                 }
                 return FNArrayFactory.create(new int[] { 1, INPUT_SHAPE[0], INPUT_SHAPE[1], INPUT_SHAPE[2] }, values);
         }
 
-        private ImageProcessor resize(ImageProcessor src, int dstW, int dstH) {
-                ImageProcessor dst = src.createProcessor(dstW, dstH);
-                double xScale = ((double) dstW) / src.getWidth();
-                double yScale = ((double) dstH) / src.getHeight();
+        private Object resize(ImageProcessor src) {
+                int[] pixels = new int[INPUT_SHAPE[0] * INPUT_SHAPE[1]];
+                double xScale = ((double) INPUT_SHAPE[0]) / src.getWidth();
+                double yScale = ((double) INPUT_SHAPE[1]) / src.getHeight();
                 int pul, pur, pll, plr;
                 double rul, rur, rll, rlr;
                 double gul, gur, gll, glr;
@@ -142,10 +143,10 @@ public class MorphAdenoid_ implements PlugIn {
                                 r = (int) (rul + rur + rll + rlr + 0.5);
                                 g = (int) (gul + gur + gll + glr + 0.5);
                                 b = (int) (bul + bur + bll + blr + 0.5);
-                                dst.putPixel(w, h, (r << 16) | (g << 8) | b);
+                                pixels[INPUT_SHAPE[0] * h + w] = (r << 16) | (g << 8) | b;
                         }
                 }
-                return dst;
+                return (Object) pixels;
         }
 
         private int getRed(int pixel) {
