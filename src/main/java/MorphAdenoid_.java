@@ -1,6 +1,4 @@
 
-import java.awt.Color;
-import java.awt.Image;
 import java.util.Arrays;
 import java.util.stream.IntStream;
 
@@ -10,9 +8,6 @@ import ij.ImagePlus;
 import ij.ImageStack;
 import ij.gui.GenericDialog;
 import ij.plugin.PlugIn;
-import ij.process.ByteProcessor;
-import ij.process.ColorProcessor;
-import ij.process.FloatProcessor;
 import ij.process.ImageProcessor;
 import neural.network.core.FNArray;
 import neural.network.core.FNArrayFactory;
@@ -98,55 +93,32 @@ public class MorphAdenoid_ implements PlugIn {
         }
 
         private FNArray getSample(ImageProcessor ip) {
-                int[] pixels = (int[]) resize(ip);
-                float[] values = new float[INPUT_SHAPE[0] * INPUT_SHAPE[1] * INPUT_SHAPE[2]];
-                int chLength = INPUT_SHAPE[0] * INPUT_SHAPE[1];
-                for (int i = 0; i < pixels.length / INPUT_SHAPE[2]; i += INPUT_SHAPE[2]) {
-                        values[i] = pixels[i];
-                        values[i + chLength] = pixels[i + 1];
-                        values[i + 2 * chLength] = pixels[i + 2];
-                }
+                float[] values = resize(ip);
                 return FNArrayFactory.create(new int[] { 1, INPUT_SHAPE[0], INPUT_SHAPE[1], INPUT_SHAPE[2] }, values);
         }
-
-        private Object resize(ImageProcessor src) {
-                int[] pixels = new int[INPUT_SHAPE[0] * INPUT_SHAPE[1]];
-                double xScale = ((double) INPUT_SHAPE[0]) / src.getWidth();
-                double yScale = ((double) INPUT_SHAPE[1]) / src.getHeight();
-                int pul, pur, pll, plr;
-                double rul, rur, rll, rlr;
-                double gul, gur, gll, glr;
-                double bul, bur, bll, blr;
-                int r, g, b;
-                for (int w = 0; w < INPUT_SHAPE[0]; w++) {
-                        for (int h = 0; h < INPUT_SHAPE[1]; h++) {
-                                int x = (int) (w / xScale);
-                                int y = (int) (h / yScale);
-                                double dx = (w / xScale) - x;
-                                double dy = (h / yScale) - y;
-                                pul = src.getPixel(x, y);
-                                rul = dx * dy * getRed(pul);
-                                gul = dx * dy * getGreen(pul);
-                                bul = dx * dy * getBlue(pul);
-                                pur = src.getPixel(x + 1, y);
-                                rur = (1 - dx) * dy * getRed(pur);
-                                gur = (1 - dx) * dy * getGreen(pur);
-                                bur = (1 - dx) * dy * getBlue(pur);
-                                pll = src.getPixel(x, y + 1);
-                                rll = dx * (1 - dy) * getRed(pll);
-                                gll = dx * (1 - dy) * getGreen(pll);
-                                bll = dx * (1 - dy) * getBlue(pll);
-                                plr = src.getPixel(x + 1, y + 1);
-                                rlr = (1 - dx) * (1 - dy) * getRed(plr);
-                                glr = (1 - dx) * (1 - dy) * getGreen(plr);
-                                blr = (1 - dx) * (1 - dy) * getBlue(plr);
-                                r = (int) (rul + rur + rll + rlr + 0.5);
-                                g = (int) (gul + gur + gll + glr + 0.5);
-                                b = (int) (bul + bur + bll + blr + 0.5);
-                                pixels[INPUT_SHAPE[0] * h + w] = (r << 16) | (g << 8) | b;
-                        }
+        
+        private float[] resize(ImageProcessor src) {
+                float[] values = new float[INPUT_SHAPE[0] * INPUT_SHAPE[1] * INPUT_SHAPE[2]];
+                float xScale = ((float) INPUT_SHAPE[0]) / src.getWidth();
+                float yScale = ((float) INPUT_SHAPE[1]) / src.getHeight();
+                int p = 0, cLength = INPUT_SHAPE[0] * INPUT_SHAPE[1];
+                for (int i = 0; i < values.length / INPUT_SHAPE[2]; i += INPUT_SHAPE[2]) {
+                        p = getPixel(src, i, xScale, yScale);
+                        values[i] = (getRed(p)<<24) | (getGreen(p)<<16) | (getBlue(p)<<8);
+                        p = getPixel(src, i + 1, xScale, yScale);
+                        values[i + cLength] = (getRed(p)<<24) | (getGreen(p)<<16) | (getBlue(p)<<8);
+                        p = getPixel(src, i + 2, xScale, yScale);
+                        values[i + 2 * cLength] = (getRed(p)<<24) | (getGreen(p)<<16) | (getBlue(p)<<8);
                 }
-                return (Object) pixels;
+                return values;
+        }
+
+        private int getPixel(ImageProcessor src, int i, float xScale, float yScale) {
+                int w = (int) ((float) i % INPUT_SHAPE[0]);
+                int h = (int) ((float) i / INPUT_SHAPE[0]);
+                int wFactor = Math.round(w / xScale);
+                int hFactor = Math.round(h / yScale);
+                return src.getPixel(wFactor, hFactor);
         }
 
         private int getRed(int pixel) {
