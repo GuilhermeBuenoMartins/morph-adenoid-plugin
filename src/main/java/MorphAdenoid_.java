@@ -93,32 +93,44 @@ public class MorphAdenoid_ implements PlugIn {
         }
 
         private FNArray getSample(ImageProcessor ip) {
-                float[] values = resize(ip);
-                return FNArrayFactory.create(new int[] { 1, INPUT_SHAPE[0], INPUT_SHAPE[1], INPUT_SHAPE[2] }, values);
-        }
-        
-        private float[] resize(ImageProcessor src) {
-                float[] values = new float[INPUT_SHAPE[0] * INPUT_SHAPE[1] * INPUT_SHAPE[2]];
-                float xScale = ((float) INPUT_SHAPE[0]) / src.getWidth();
-                float yScale = ((float) INPUT_SHAPE[1]) / src.getHeight();
-                int p = 0, cLength = INPUT_SHAPE[0] * INPUT_SHAPE[1];
-                for (int i = 0; i < values.length / INPUT_SHAPE[2]; i += INPUT_SHAPE[2]) {
-                        p = getPixel(src, i, xScale, yScale);
-                        values[i] = (getRed(p)<<24) | (getGreen(p)<<16) | (getBlue(p)<<8);
-                        p = getPixel(src, i + 1, xScale, yScale);
-                        values[i + cLength] = (getRed(p)<<24) | (getGreen(p)<<16) | (getBlue(p)<<8);
-                        p = getPixel(src, i + 2, xScale, yScale);
-                        values[i + 2 * cLength] = (getRed(p)<<24) | (getGreen(p)<<16) | (getBlue(p)<<8);
+                float[] pixels = new float[INPUT_SHAPE[0] * INPUT_SHAPE[1] * INPUT_SHAPE[2]];
+                float wScale = (float) INPUT_SHAPE[0] / ip.getWidth();
+                float hScale = (float) INPUT_SHAPE[1] / ip.getHeight();
+                int xi, yi;
+                int p, offset;
+                double rul, rur, rll, rlr;
+                double gul, gur, gll, glr;
+                double bul, bur, bll, blr;
+                float xf, yf;
+                for (int x = 0; x < INPUT_SHAPE[0]; x++) {
+                        for (int y = 0; y < INPUT_SHAPE[1]; y++) {
+                                xi = (int) (x / wScale);
+                                yi = (int) (y / hScale);
+                                xf = (x / wScale) - xi;
+                                yf = (y / hScale) - yi;
+                                p = ip.getPixel(xi, yi);
+                                rul = (1 - xf) * (1 - yf) * getRed(p);
+                                gul = (1 - xf) * (1 - yf) * getGreen(p);
+                                bul = (1 - xf) * (1 - yf) * getBlue(p);
+                                p = ip.getPixel(xi + 1, yi);
+                                rur = xf * (1 - yf) * getRed(p);
+                                gur = xf * (1 - yf) * getGreen(p);
+                                bur = xf * (1 - yf) * getBlue(p);
+                                p = ip.getPixel(xi, yi + 1);
+                                rll = (1 - xf) * yf * getRed(p);
+                                gll = (1 - xf) * yf * getGreen(p);
+                                bll = (1 - xf) * yf * getBlue(p);
+                                p = ip.getPixel(xi + 1, yi + 1);
+                                rlr = xf * yf * getRed(p);
+                                glr = xf * yf * getGreen(p);
+                                blr = xf * yf * getBlue(p);
+                                offset = INPUT_SHAPE[2] * (INPUT_SHAPE[0] * y + x);
+                                pixels[offset] = (int) (rul + rur + rll + rlr + 0.5);
+                                pixels[offset + 1] = (int) (gul + gur + gll + glr + 0.5);
+                                pixels[offset + 2] = (int) (bul + bur + bll + blr + 0.5);
+                        }
                 }
-                return values;
-        }
-
-        private int getPixel(ImageProcessor src, int i, float xScale, float yScale) {
-                int w = (int) ((float) i % INPUT_SHAPE[0]);
-                int h = (int) ((float) i / INPUT_SHAPE[0]);
-                int wFactor = Math.round(w / xScale);
-                int hFactor = Math.round(h / yScale);
-                return src.getPixel(wFactor, hFactor);
+                return FNArrayFactory.create(new int[] { 1, INPUT_SHAPE[1], INPUT_SHAPE[0], INPUT_SHAPE[2] }, pixels);
         }
 
         private int getRed(int pixel) {
@@ -130,6 +142,6 @@ public class MorphAdenoid_ implements PlugIn {
         }
 
         private int getBlue(int pixel) {
-                return pixel & 0xff;
+                return (pixel & 0xff);
         }
 }
