@@ -60,7 +60,8 @@ public class MorphAdenoid_ implements PlugIn {
 
         private void classify(ImageStack stack) {
                 final int step = getStep(stack);
-                IntStream.range(0, stack.getSize()).filter(i -> i % step == 0).forEach(i -> {
+                for (int i = 0; i < stack.getSize(); i += step) {
+                        IJ.showProgress((double) i / stack.getSize());
                         FNArray x = getSample(stack.getProcessor(i + 1));
                         long startTime = System.currentTimeMillis();
                         float score = Config.getModel().predict(x).get(0, 0);
@@ -69,8 +70,7 @@ public class MorphAdenoid_ implements PlugIn {
                                 new ImagePlus(String.format(TITLE_CLASSIFIED_IMAGE, "POSITIVE", time, score),
                                                 stack.getProcessor(i + 1)).show();
                         }
-                        IJ.showProgress(i + 1, stack.getSize());
-                });
+                }
                 IJ.showProgress(1);
         }
 
